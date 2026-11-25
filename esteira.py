@@ -1,6 +1,5 @@
-from planta import *
 import random
-
+import math
 
 # #esboço parte da esteira 
 # #Ligar e desligar a esteira.
@@ -13,59 +12,115 @@ import random
 
 class Esteira:
 
-    def __init__(self):
+    TEMPO_MUDANCA_FAIXA = 30.0
+    TEMPO_MUDANCA_VELOCIDADE = 10.0
+
+    # Faixas de velocidade
+    LIMITES_FAIXAS = {
+
+        1: (1.00, 1.25),
+
+        2: (1.25, 1.50),
+
+        3: (1.50, 1.75),
+
+        4: (1.75, 2.00)
+
+    }
+
+
+    # Intervalo em segundos para entrada de peças novas
+    INTERVALOS_PECAS = {
+
+        1: 12.0,
+
+        2: 10.0,
+
+        3: 8.0,
+
+        4: 6.0
+
+    }
+
+    def atualizar(self, planta, delta_t):
+
+        if delta_t <= 0:
+            return
+
+        # Se estiver desligada, os temporizadores ficam pausados.
+        if not planta.esteira_ligada:
+
+            planta.velocidade = 0.0
+
+            return
+
+        tempo_restante = float(delta_t)
+
+        tolerancia = 1e-9
+
+        while True:
+
+            # Primeiro, verifica a mudança de faixa.
+            if planta.proxima_mudanca_faixa <= tolerancia:
+
+                self.sortear_faixa(planta)
+
+                planta.proxima_mudanca_faixa = self.TEMPO_MUDANCA_FAIXA
+
+            # Depois, verifica a mudança de velocidade.
+            if planta.proxima_mudanca_velocidade <= tolerancia:
+
+                self.sortear_velocidade(planta)
+
+                planta.proxima_mudanca_velocidade = self.TEMPO_MUDANCA_VELOCIDADE
+
+            if tempo_restante <= tolerancia:
+                break
+
+
+            #Contagem dos Temporizadores
+            proximo_evento = min(planta.proxima_mudanca_faixa,planta.proxima_mudanca_velocidade)
+
+            intervalo = min(tempo_restante,proximo_evento)
+
+            planta.proxima_mudanca_faixa -= intervalo
+
+            planta.proxima_mudanca_velocidade -= intervalo
+
+            tempo_restante = max(0.0,tempo_restante - intervalo)
+
         
-        self.esteira_ligada = True
 
-        def LigaDesliga(self, temperatura):
+    def desligar_por_temperatura(self, planta, temperatura):
 
-            if temperatura >= 100:
-                self.esteira_ligada = False
+        if temperatura >= 100:
 
-                return self.esteira_ligada
+            planta.esteira_ligada = False
+
+            planta.velocidade = 0
+
+            return True
         
-            self.esteira_ligada = True
 
-            return self.esteira_ligada
+        return False
 
 
-        def sorteio_faixa_velocidade(self):
+    def sortear_faixa(self, planta):
+        
+        planta.faixa = random.randint(1,4)
 
-            if self.esteira_ligada == True:
+    
+    def sortear_velocidade(self, planta):
+        
+        limite_inferior, limite_superior = (self.LIMITES_FAIXAS[planta.faixa])
 
-                if planta.proxima_mudanca_faixa == 0:
+        if planta.faixa > 1:
+
+            limite_inferior = math.nextafter(limite_inferior, math.inf)
+
+        planta.velocidade = random.uniform(limite_inferior, limite_superior)
+
                     
-                    numero = random.randint(1, 4)
-
-                    planta.faixa = numero
-
-                    planta.proxima_mudanca_faixa = 30
-
-                if planta.proxima_mudanca_velocidade == 0:
-
-                    if planta.faixa == 1:
-                        numero = random.random(1.0, 1.25)
-                        planta.velocidade = numero
-
-                    elif planta.faixa == 2:
-                        numero = random.random(1.25, 1.50)
-                        planta.velocidade = numero
-
-                    elif planta.faixa == 3:
-                        numero = random.random(1.50, 1.75)
-                        planta.velocidade = numero
-
-                    else:
-                        numero = random.random(1.75, 2.0)
-                        planta.velocidade = numero  
-                    
-        def intervalo_pecas(self):
-
-            self.intervalo = [12, 10, 8, 6]
-
-            aux = planta.faixa - 1    
-            planta.proxima_entrada_peca = self.intervalo[aux]
-
-            
-            pass
+    def intervalo_pecas(self, planta):
+        return self.INTERVALOS_PECAS(planta.faixa)
 

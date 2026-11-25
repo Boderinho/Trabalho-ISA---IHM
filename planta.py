@@ -2,9 +2,11 @@
 import time
 
 from threading import RLock
-from esteira import *
+from esteira import Esteira
 
 class PlantaIndustrial:
+
+    PASSO_SIMULACAO = 2.0
 
     def __init__(self):
 
@@ -12,12 +14,12 @@ class PlantaIndustrial:
         # CONTROLE TEMPORAL
         # ==================================================
 
-        # Relógio monotônico: evita problemas com ajustes
-        # no relógio do sistema operacional.
+        # Relógio:
         self.ultimo_processamento = time.monotonic()
 
         # Tempo acumulado da simulação, em segundos.
         self.tempo_simulacao = 0.0
+        self.acumulador_tempo = 0.0
 
         # Proteção contra atualizações simultâneas.
         self.lock = RLock()
@@ -28,7 +30,7 @@ class PlantaIndustrial:
 
         self.esteira_ligada = True
         self.velocidade = 2.0
-        self.faixa = 4 #coloquei isso aqui para conseguir me localizar em qual faixa que eu estou e com base nisso fazer os sorteios de velocidade
+        self.faixa = 4 
         self.temperatura = 30.0
 
         # Contadores de produção.
@@ -46,10 +48,9 @@ class PlantaIndustrial:
         # False = reprovada.
         self.resultado_inspecao = None
 
-        # ==================================================
+        
         # ESTADO INTERNO DA SIMULAÇÃO
-        # ==================================================
-
+        
         # Lista de peças presentes na esteira.
         self.pecas = []
 
@@ -59,26 +60,17 @@ class PlantaIndustrial:
         # Histórico de eventos ocorridos.
         self.historico_eventos = []
 
-        # ==================================================
-        # PRÓXIMOS EVENTOS
-        # ==================================================
+        
+        # TEMPORIZADORES PARA PRÓXIMOS EVENTOS
+        
 
         self.proxima_mudanca_faixa = 30.0
         self.proxima_mudanca_velocidade = 10.0
         self.proxima_entrada_peca = None
 
-        # ==================================================
-        # INICIALIZAÇÃO DOS MÓDULOS
-        # ==================================================
+        # MODULOS
 
-        # Os módulos serão adicionados conforme forem
-        # desenvolvidos:
-        #
-        # self.esteira = Esteira()
-        # self.pecas = GerenciadorPecas()
-        # self.inspecao = Inspecao()
-        # self.temperatura_motor = Temperatura()
-        # self.alarmes = GerenciadorAlarmes()
+        self.esteira = Esteira()
 
     # ======================================================
     # ATUALIZAÇÃO PRINCIPAL
@@ -88,7 +80,7 @@ class PlantaIndustrial:
 
         """
         Atualiza o estado da planta com base no tempo
-        transcorrido desde o último processamento.
+        transcorrido desde o último processamento
 
         Este método será chamado quando houver uma
         solicitação de leitura ao servidor Modbus.
@@ -107,33 +99,35 @@ class PlantaIndustrial:
             self.ultimo_processamento = agora
 
             # Avança o relógio interno da simulação.
-            self.tempo_simulacao += delta_t
+            self.acumulador_tempo += delta_t
 
-            # Processa os eventos ocorridos no intervalo.
-            self.processar_eventos(delta_t)
+            # Processa todos os passos completos
+            while self.acumulador_tempo >= self.PASSO_SIMULACAO:
 
-            # Verifica a consistência da planta.
-            self.verificar_consistencia()
+                self.processar_eventos(self.PASSO_SIMULACAO)
 
-            # Retorna as variáveis atualizadas.
+                # o passo só conga quando há processamento
+                self.tempo_simulacao += self.PASSO_SIMULACAO
+
+                self.acumulador_tempo -= self.PASSO_SIMULACAO
+
+                self.verificar_consistencia()
+
             return self.obter_variaveis()
 
-    # ======================================================
-    # PROCESSAMENTO DOS EVENTOS
-    # ======================================================
+
+    # Processamento
 
     def processar_eventos(self, delta_t):
 
         """
         Coordena o processamento dos eventos da planta.
 
-        IMPORTANTE:
-        Esta estrutura ainda não implementa a cronologia
-        dos eventos. Ela será desenvolvida posteriormente.
         """
 
         # 1. Atualizar sorteios de velocidade e faixa.
-        # self.esteira.atualizar(delta_t)
+        self.esteira.atualizar(self, delta_t)
+        
 
         # 2. Gerar novas peças.
         # self.gerenciador_pecas.atualizar_entradas(delta_t)
@@ -150,39 +144,28 @@ class PlantaIndustrial:
         # 6. Verificar alarmes.
         # self.gerenciador_alarmes.atualizar(delta_t)
 
-        pass
 
-    # ======================================================
     # VERIFICAÇÃO DE CONSISTÊNCIA
-    # ======================================================
+    
 
     def verificar_consistencia(self):
 
-        # A velocidade deve ser zero quando a esteira
-        # estiver desligada.
+        # Sem velocidade a esteira desligada
+
         if not self.esteira_ligada:
             self.velocidade = 0.0
 
-        # A produção total deve corresponder à soma
-        # das peças aprovadas e rejeitadas.
+        # A produção total deve corresponder à soma das peças aprovadas e rejeitadas.
         if self.producao_total != (
             self.pecas_aprovadas + self.pecas_rejeitadas
         ):
-            raise RuntimeError(
-                "Inconsistência nos contadores de produção."
-            )
+            raise RuntimeError("Inconsistência nos contadores de produção.")
 
         # Limites da temperatura.
-        self.temperatura = max(
-            25.0,
-            min(110.0, self.temperatura)
-        )
+        self.temperatura = max(25.0, min(110.0, self.temperatura))
 
         # Limites físicos da velocidade.
-        self.velocidade = max(
-            0.0,
-            min(2.0, self.velocidade)
-        )
+        self.velocidade = max(0.0, min(2.0, self.velocidade))
 
     # ======================================================
     # DISPONIBILIZAÇÃO DAS VARIÁVEIS
@@ -192,9 +175,6 @@ class PlantaIndustrial:
 
         """
         Retorna as nove variáveis principais da planta.
-
-        Este dicionário será utilizado posteriormente
-        para alimentar os registradores Modbus.
         """
 
         with self.lock:
@@ -232,17 +212,24 @@ if __name__ == "__main__":
 
     print("Simulador industrial inicializado.")
 
-    while True:
+    try:
 
-        # Simula uma solicitação de leitura.
-        variaveis = planta.atualizar()
+        while True:
 
-        print("\nTempo de simulação:",
-              round(planta.tempo_simulacao, 2), "s")
+            # Simula uma solicitação de leitura.
+            variaveis = planta.atualizar()
 
-        print("Variáveis da planta:")
-        print(variaveis)
+            print("\nTempo de simulação:",
+                round(planta.tempo_simulacao, 2), "s")
 
-        # Intervalo apenas para simular requisições.
-        # Não representa um ciclo interno da planta.
-        time.sleep(2)
+            print("Variáveis da planta:")
+            print(variaveis)
+            print(planta.faixa)
+
+            # Intervalo apenas para simular requisições.
+            # Não representa um ciclo interno da planta.
+            time.sleep(2)   
+
+    except KeyboardInterrupt:
+
+        print("\nTeste Encerrado!")
