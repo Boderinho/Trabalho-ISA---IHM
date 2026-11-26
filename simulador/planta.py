@@ -22,7 +22,7 @@ VEL_MAX = 2.0             # m/s
 VEL_INI = 1.5             # m/s
 VEL_DESVIO = 0.1
 PROB_APROVACAO = 0.95
-CONTADOR_MAX = 100_000
+CONTADOR_MAX = 65_535
 
 
 class Planta:
