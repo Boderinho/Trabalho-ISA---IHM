@@ -8,10 +8,10 @@ Nesta etapa do versionamento, é necessário utilizar dois terminais da raiz do 
 para executar o cliente e o servidor.
 
 Comece pelo servidor
-"python -m servidor_modbus.py"
+"python -m simulador.servidor_modbus.py"
 
 E depois pelo cliente
-"python -m cliente_teste.py"
+"python -m simulador.cliente_teste.py"
 """
 
 import time

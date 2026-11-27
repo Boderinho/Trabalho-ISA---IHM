@@ -16,6 +16,8 @@ Os INT ocupam 1 registrador (0 a 65.535). Por isso CONTADOR_MAX em planta.py
 deve ser 65_535.
 """
 
+import os
+
 # Rede
 MODBUS_HOST = "localhost"
 MODBUS_PORTA = 5020          # 502 exige privilégio de administrador
@@ -33,3 +35,11 @@ REG_REJEITADAS = 6
 # Bloco lido de uma só vez (uma leitura do bloco = um passo da simulação)
 REG_INICIO = 0
 QTD_REGS = 7
+
+# API (web service)
+API_PORTA = 8000
+CAMINHO_DB = "dados/planta.db"
+
+# "streamlit": as regras de automação rodam no web service
+# "scada":     o web service só entrega dados; as regras ficam no ScadaBR
+MODO = os.getenv("MODO", "streamlit")
